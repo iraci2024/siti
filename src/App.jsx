@@ -254,7 +254,8 @@ const CpfFetcher = () => {
     <div style={styles.container}>
       <form>
         <label>
-          Upload de arquivo TXT com CPFs:
+          Boas vindas ao nosso sistema, marcha no trampo do SANTA e entre outros
+          Aqui meu maninho voce vai fazer o Upload de arquivo TXT com CPFs:
           <input
             type="file"
             accept=".txt"
