@@ -4,6 +4,9 @@ import axios from 'axios';
 const CpfFetcher = () => {
   const [results, setResults] = useState([]);
   const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
 
   const handleTxtUpload = (file) => {
     const reader = new FileReader();
@@ -13,13 +16,41 @@ const CpfFetcher = () => {
 
       setError(null);
       setResults([]);
+      setLoading(true);
+      setLoadingMessage(`Carregando ${lines.length} CPFs...`);
+
       try {
         const validCpfs = lines.map(parseCpf).filter((cpf) => cpf !== null);
-        const results = await Promise.all(validCpfs.map(fetchData));
-        const sortedResults = sortAndGroupByAge(results);
+
+        // Processa as requisições em lotes de 50 CPFs
+        const batchedCpfs = [];
+        for (let i = 0; i < validCpfs.length; i += 50) {
+          batchedCpfs.push(validCpfs.slice(i, i + 50));
+        }
+
+        const processedResults = [];
+        for (let batch of batchedCpfs) {
+          // Mapeia o lote de CPFs para promessas de requisição
+          const batchPromises = batch.map(cpfData => fetchData(cpfData));
+
+          // Executa as requisições do lote em paralelo
+          const batchResults = await Promise.all(batchPromises);
+          batchResults.forEach(result => {
+            if (result) {
+              processedResults.push(result);
+            }
+          });
+
+          setLoadingMessage(`Carregando ${processedResults.length} de ${validCpfs.length} CPFs...`);
+        }
+
+        const sortedResults = sortAndGroupByAge(processedResults);
         setResults(sortedResults);
       } catch (err) {
         setError(err.message);
+      } finally {
+        setLoading(false);
+        setLoadingMessage('');
       }
     };
     reader.readAsText(file);
@@ -197,6 +228,19 @@ const CpfFetcher = () => {
     link.click();
   };
 
+  const filterResults = (results) => {
+    const filteredResults = {};
+    Object.entries(results).forEach(([category, categoryResults]) => {
+      const filteredCategoryResults = categoryResults.filter(result =>
+        result.originalLine.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      if (filteredCategoryResults.length > 0) {
+        filteredResults[category] = filteredCategoryResults;
+      }
+    });
+    return filteredResults;
+  };
+
   const styles = {
     container: {
       maxWidth: '800px',
@@ -247,15 +291,31 @@ const CpfFetcher = () => {
       margin: '10px 0',
       cursor: 'pointer',
       borderRadius: '4px',
-    }
+    },
+    loadingMessage: {
+      marginBottom: '10px',
+      fontStyle: 'italic',
+      color: '#888',
+    },
+    searchInput: {
+      marginBottom: '10px',
+      padding: '8px',
+      borderRadius: '4px',
+      border: '1px solid #ccc',
+      width: '100%',
+      boxSizing: 'border-box',
+    },
+  };
+
+  const handleSearchTermChange = (e) => {
+    setSearchTerm(e.target.value);
   };
 
   return (
     <div style={styles.container}>
       <form>
         <label>
-          Boas vindas ao nosso sistema, marcha no trampo do SANTA e entre outros
-          Aqui meu maninho voce vai fazer o Upload de arquivo TXT com CPFs:
+          Upload de arquivo TXT com CPFs:
           <input
             type="file"
             accept=".txt"
@@ -263,8 +323,16 @@ const CpfFetcher = () => {
           />
         </label>
       </form>
+      <input
+        type="text"
+        placeholder="Pesquisar..."
+        style={styles.searchInput}
+        value={searchTerm}
+        onChange={handleSearchTermChange}
+      />
+      {loading && <p style={styles.loadingMessage}>{loadingMessage}</p>}
       {error && <p>Erro: {error}</p>}
-      {Object.entries(results).map(([category, categoryResults]) => (
+      {Object.entries(filterResults(results)).map(([category, categoryResults]) => (
         <div key={category} style={styles.category}>
           <h2>{category}</h2>
           {categoryResults.map((result, index) => (
