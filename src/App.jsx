@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import AnnotationModal from './AnnotationModal'; // Importe o componente da modal aqui
 
 const CpfFetcher = () => {
   const [results, setResults] = useState([]);
@@ -7,6 +8,9 @@ const CpfFetcher = () => {
   const [loading, setLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [annotationModalOpen, setAnnotationModalOpen] = useState(false);
+  const [currentCpfToAnnotate, setCurrentCpfToAnnotate] = useState(null);
+  const [annotations, setAnnotations] = useState({});
 
   const handleTxtUpload = (file) => {
     const reader = new FileReader();
@@ -259,6 +263,7 @@ const CpfFetcher = () => {
       backgroundColor: '#fff',
       borderRadius: '8px',
       boxShadow: '0 2px 5px rgba(0, 0, 0, 0.1)',
+      position: 'relative', // Adiciona posição relativa para posicionamento absoluto do botão
     },
     header: {
       marginBottom: '10px',
@@ -305,10 +310,37 @@ const CpfFetcher = () => {
       width: '100%',
       boxSizing: 'border-box',
     },
+    annotationButton: {
+      position: 'absolute',
+      bottom: '10px',
+      right: '10px',
+      backgroundColor: '#007BFF',
+      border: 'none',
+      color: 'white',
+      padding: '8px 12px',
+      borderRadius: '4px',
+      cursor: 'pointer',
+    },
   };
 
   const handleSearchTermChange = (e) => {
     setSearchTerm(e.target.value);
+  };
+
+  const openAnnotationModal = (cpf) => {
+    setCurrentCpfToAnnotate(cpf);
+    setAnnotationModalOpen(true);
+  };
+
+  const closeAnnotationModal = () => {
+    setCurrentCpfToAnnotate(null);
+    setAnnotationModalOpen(false);
+  };
+
+  const saveAnnotation = (note) => {
+    if (currentCpfToAnnotate) {
+      setAnnotations({ ...annotations, [currentCpfToAnnotate]: note });
+    }
   };
 
   return (
@@ -353,9 +385,21 @@ const CpfFetcher = () => {
                   <li key={idx}>{email.email} - {email.prioridade}</li>
                 ))}
               </ul>
-              <p style={styles.originalLine}>INFO: {result.originalLine}</p>
               <p style={styles.info}>Saldo disponível: R${result.saldoDisponivel.toFixed(2)}</p>
               <p style={styles.info}>Saldo + Cheque Especial: R${result.saldoChequeEspecial.toFixed(2)}</p>
+              <button
+                style={styles.annotationButton}
+                onClick={() => openAnnotationModal(result.cpf)}
+              >
+                Adicionar Anotação
+              </button>
+              <p style={styles.originalLine}>INFO: {result.originalLine}</p>
+              <AnnotationModal
+                isOpen={annotationModalOpen && currentCpfToAnnotate === result.cpf}
+                onClose={closeAnnotationModal}
+                onSave={saveAnnotation}
+                initialNote={annotations[result.cpf] || ''}
+              />
             </div>
           ))}
           <button
